@@ -34,7 +34,7 @@ class Scanner(object):
         happen during its code importing process, including
         :exc:`ImportError`.  If you use a custom ``onerror`` callback, you
         can change this behavior.
-        
+
         Here's an example ``onerror`` callback that ignores
         :exc:`ImportError`::
 
@@ -95,7 +95,7 @@ class Scanner(object):
 
         A string or callable alone can also be passed as ``ignore`` without a
         surrounding list.
-        
+
         .. note:: the ``ignore`` argument is new as of Venusian 1.0a3.
         """
 
@@ -103,7 +103,7 @@ class Scanner(object):
 
         if ignore is not None and not is_nonstr_iter(ignore):
             ignore = [ignore]
-        
+
         def _ignore(fullname):
             if ignore is not None:
                 for ign in ignore:
@@ -124,12 +124,30 @@ class Scanner(object):
 
         seen = set()
 
+	def getdecoratedroot(ob):
+            # Iterate down through N decorators until the real function is found    
+            while ob.func_closure:
+                closure = ob.func_closure[0]
+                ob = closure.cell_contents
+            return ob
+
+	
         def invoke(mod_name, name, ob):
+           
+            if getattr(ob,'func_closure', None) and ob.func_closure:
+	            # We have a decorated function, so try to get the real function below
+                    realob = getdecoratedroot(ob)
+                    obmodule = getmodule(realob)
+            else:
+                    realob = ob
+
+	    # realob has the real object whatever happened before. We'll use that
+            # to get the module, while keeping the original ob
             try:
-                obmodule = getmodule(ob)
+                obmodule = getmodule(realob)
             except NameError: # pragma: no cover
                 # work around bug in virtualenv integration on Python 3.
-                # symptom: 
+                # symptom:
                 #
                 # File "/venv/lib/python3.2/site.py", line 425, in __setup
                 #    fp = file(filename, "rU")
@@ -141,6 +159,9 @@ class Scanner(object):
                     # avoid processing objects that were imported into this
                     # module but were not actually defined here
                     return
+            # else:
+            #     if mod_name=='max.rest.people':
+            #         import ipdb;ipdb.set_trace()
 
             # in one scan, we only process each object once
             if id(ob) in seen:
@@ -255,7 +276,7 @@ class AttachInfo(object):
       representing the context of the venusian decorator used.  Eg.
       ``('/home/chrism/projects/venusian/tests/test_advice.py', 81,
       'testCallInfo', 'add_handler(foo, bar)')``
-      
+
     """
     def __init__(self, **kw):
         self.__dict__.update(kw)
@@ -272,7 +293,7 @@ class Categories(dict):
         if self.attached_id:
             return self.attached_id == id(obj)
         return True
-    
+
 def attach(wrapped, callback, category=None, depth=1):
     """ Attach a callback to the wrapped object.  It will be found
     later during a scan.  This function returns an instance of the
